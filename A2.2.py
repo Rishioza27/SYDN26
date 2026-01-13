@@ -2,8 +2,7 @@ import pandas as pd
 import os
 import math
 
-
-# map month names to Australian seasons
+# map months to Australian seasons
 def getSeason(month):
     if month in ["December", "January", "February"]:
         return "Summer"
@@ -11,32 +10,56 @@ def getSeason(month):
         return "Autumn"
     elif month in ["June", "July", "August"]:
         return "Winter"
-    else:
+    elif month in ["September", "October", "November"]:
         return "Spring"
-
+    else:
+        return None
 
 def analyseTemperatures():
 
     folderPath = "temperatures"
+
+    # basic folder check
+    if not os.path.exists(folderPath):
+        print("Temperatures folder not found.")
+        return
+
     dataFrames = []
 
-    # read all csv files
+    # read CSV files
     for fileName in os.listdir(folderPath):
         if fileName.endswith(".csv"):
             filePath = os.path.join(folderPath, fileName)
-            df = pd.read_csv(filePath)
-            dataFrames.append(df)
+            try:
+                df = pd.read_csv(filePath)
+                dataFrames.append(df)
+            except:
+                print(f"Could not read file: {fileName}")
 
-    # combine all files
+    if len(dataFrames) == 0:
+        print("No temperature data files found.")
+        return
+
+    # combine all years
     data = pd.concat(dataFrames, ignore_index=True)
 
-    # list of month columns
+    # expected columns
     monthColumns = [
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
     ]
 
-    # convert wide format to long format
+    # simple column check
+    if "STATION_NAME" not in data.columns:
+        print("STATION_NAME column missing in data.")
+        return
+
+    for month in monthColumns:
+        if month not in data.columns:
+            print(f"Missing month column: {month}")
+            return
+
+    # convert wide data to long format
     longData = data.melt(
         id_vars=["STATION_NAME"],
         value_vars=monthColumns,
@@ -44,20 +67,25 @@ def analyseTemperatures():
         value_name="Temperature"
     )
 
-    # remove missing values
+    # remove missing temperature values
     longData = longData.dropna(subset=["Temperature"])
 
-    # assign season
+    if longData.empty:
+        print("No valid temperature values found.")
+        return
+
+    # assign seasons
     longData["Season"] = longData["Month"].apply(getSeason)
 
-    #  Seasonal Average 
+    # Seasonal Average
     seasonalAvg = longData.groupby("Season")["Temperature"].mean()
 
     with open("average_temp.txt", "w") as file:
-        for season, avg in seasonalAvg.items():
-            file.write(f"{season}: {avg:.1f}°C\n")
+        for season in ["Summer", "Autumn", "Winter", "Spring"]:
+            if season in seasonalAvg:
+                file.write(f"{season}: {seasonalAvg[season]:.1f}°C\n")
 
-    #  Temperature Range 
+    # Temperature Range
     stationStats = longData.groupby("STATION_NAME")["Temperature"].agg(["max", "min"])
     stationStats["range"] = stationStats["max"] - stationStats["min"]
 
@@ -71,23 +99,25 @@ def analyseTemperatures():
                 f"(Max: {row['max']:.1f}°C, Min: {row['min']:.1f}°C)\n"
             )
 
-    #  Temperature Stability 
+    # Temperature Stability
     stdDevs = longData.groupby("STATION_NAME")["Temperature"].std()
 
     minStd = stdDevs.min()
     maxStd = stdDevs.max()
 
     with open("temperature_stability_stations.txt", "w") as file:
-        file.write("Most Stable:\n")
+
         for station, std in stdDevs.items():
             if math.isclose(std, minStd):
-                file.write(f"Station {station}: StdDev {std:.1f}°C\n")
+                file.write(
+                    f"Most Stable: Station {station}: StdDev {std:.1f}°C\n"
+                )
 
-        file.write("\nMost Variable:\n")
         for station, std in stdDevs.items():
             if math.isclose(std, maxStd):
-                file.write(f"Station {station}: StdDev {std:.1f}°C\n")
-
+                file.write(
+                    f"Most Variable: Station {station}: StdDev {std:.1f}°C\n"
+                )
 
 # run program
 analyseTemperatures()
