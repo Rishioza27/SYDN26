@@ -1,30 +1,57 @@
 import tkinter as tk
 from tkinter import filedialog
 from PIL import Image, ImageTk
+import cv2
+import numpy as np
 
-class ImageApp:
+
+class ImageState:
+    def __init__(self):
+        self.currentImage = None
+        self.history = []
+
+    def loadImage(self, path):
+        img = Image.open(path).convert("RGB")
+        self.currentImage = img
+        self.history = [img.copy()]
+
+
+class ImageEditorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Image Viewer")
+        root.title("Simple Image Editor")
+        root.geometry("1000x700")
 
-        self.canvas = tk.Canvas(root, bg="grey")
+        self.state = ImageState()
+        self.displayImg = None
+
+        self.left = tk.Frame(root)
+        self.left.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
+
+        self.canvas = tk.Canvas(self.left, bg="grey")
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
-        menu = tk.Menu(root)
-        fileMenu = tk.Menu(menu, tearoff=0)
-        fileMenu.add_command(label="Open", command=self.openImage)
-        menu.add_cascade(label="File", menu=fileMenu)
-        root.config(menu=menu)
+        self.right = tk.Frame(root, width=250)
+        self.right.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self.imgTk = None
+        tk.Button(self.right, text="Open Image", command=self.openFile).pack(padx=10, pady=10)
 
-    def openImage(self):
+    def openFile(self):
         path = filedialog.askopenfilename()
         if path:
-            img = Image.open(path)
-            self.imgTk = ImageTk.PhotoImage(img)
-            self.canvas.create_image(0, 0, image=self.imgTk, anchor=tk.NW)
+            self.state.loadImage(path)
+            self.showImage()
 
-root = tk.Tk()
-app = ImageApp(root)
-root.mainloop()
+    def showImage(self):
+        img = self.state.currentImage
+        if not img:
+            return
+        disp = img.resize((600, 400))
+        self.displayImg = ImageTk.PhotoImage(disp)
+        self.canvas.create_image(300, 200, image=self.displayImg)
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ImageEditorApp(root)
+    root.mainloop()
