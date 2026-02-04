@@ -1,30 +1,72 @@
 import tkinter as tk
-from tkinter import filedialog
-from PIL import Image, ImageTk
+from PIL import Image
+import cv2
+import numpy as np
 
-class ImageApp:
+
+class ImageState:
+    def __init__(self):
+        self.currentImage = None
+        self.filePath = None
+        self.history = []
+        self.future = []
+
+    def loadImage(self, path):
+        img = Image.open(path).convert("RGB")
+        self.currentImage = img
+        self.filePath = path
+        self.history = [img.copy()]
+        self.future = []
+
+    def setImage(self, img):
+        if self.currentImage:
+            self.history.append(img.copy())
+            self.future = []
+        self.currentImage = img
+
+
+class ImageProcessor:
+    """
+    Handles image processing using OpenCV.
+    """
+
+    @staticmethod
+    def pilToCv(pilImg):
+        return cv2.cvtColor(np.array(pilImg), cv2.COLOR_RGB2BGR)
+
+    @staticmethod
+    def cvToPil(cvImg):
+        return Image.fromarray(cv2.cvtColor(cvImg, cv2.COLOR_BGR2RGB))
+
+    @staticmethod
+    def toGrayscale(pilImg):
+        cvImg = ImageProcessor.pilToCv(pilImg)
+        gray = cv2.cvtColor(cvImg, cv2.COLOR_BGR2GRAY)
+        rgb = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+        return ImageProcessor.cvToPil(rgb)
+
+    @staticmethod
+    def blur(pilImg, k):
+        if k <= 0:
+            return pilImg
+        if k % 2 == 0:
+            k += 1
+        cvImg = ImageProcessor.pilToCv(pilImg)
+        blurred = cv2.GaussianBlur(cvImg, (k, k), 0)
+        return ImageProcessor.cvToPil(blurred)
+
+
+class ImageEditorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Image Viewer")
+        root.title("Simple Image Editor")
+        root.geometry("900x600")
 
-        self.canvas = tk.Canvas(root, bg="grey")
-        self.canvas.pack(fill=tk.BOTH, expand=True)
+        self.state = ImageState()
+        tk.Label(root, text="Processing logic added").pack(pady=20)
 
-        menu = tk.Menu(root)
-        fileMenu = tk.Menu(menu, tearoff=0)
-        fileMenu.add_command(label="Open", command=self.openImage)
-        menu.add_cascade(label="File", menu=fileMenu)
-        root.config(menu=menu)
 
-        self.imgTk = None
-
-    def openImage(self):
-        path = filedialog.askopenfilename()
-        if path:
-            img = Image.open(path)
-            self.imgTk = ImageTk.PhotoImage(img)
-            self.canvas.create_image(0, 0, image=self.imgTk, anchor=tk.NW)
-
-root = tk.Tk()
-app = ImageApp(root)
-root.mainloop()
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = ImageEditorApp(root)
+    root.mainloop()
