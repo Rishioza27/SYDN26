@@ -1,54 +1,74 @@
-import tkinter as tk
-from tkinter import filedialog
+﻿import tkinter as tk
+from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
-import cv2
-import numpy as np
+import os
 
 
 class ImageState:
     def __init__(self):
         self.currentImage = None
+        self.filePath = None
         self.history = []
+        self.future = []
 
     def loadImage(self, path):
         img = Image.open(path).convert("RGB")
         self.currentImage = img
+        self.filePath = path
         self.history = [img.copy()]
+        self.future = []
+
+    def undo(self):
+        if len(self.history) > 1:
+            last = self.history.pop()
+            self.future.append(last)
+            self.currentImage = self.history[-1].copy()
+            return True
+        return False
+
+    def redo(self):
+        if self.future:
+            img = self.future.pop()
+            self.history.append(img)
+            self.currentImage = img.copy()
+            return True
+        return False
 
 
 class ImageEditorApp:
     def __init__(self, root):
         self.root = root
         root.title("Simple Image Editor")
-        root.geometry("1000x700")
 
         self.state = ImageState()
-        self.displayImg = None
+        self.status = tk.Label(root, text="No image loaded", anchor=tk.W)
+        self.status.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.left = tk.Frame(root)
-        self.left.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
-
-        self.canvas = tk.Canvas(self.left, bg="grey")
-        self.canvas.pack(fill=tk.BOTH, expand=True)
-
-        self.right = tk.Frame(root, width=250)
-        self.right.pack(side=tk.RIGHT, fill=tk.Y)
-
-        tk.Button(self.right, text="Open Image", command=self.openFile).pack(padx=10, pady=10)
+        tk.Button(root, text="Open", command=self.openFile).pack()
+        tk.Button(root, text="Undo", command=self.undo).pack()
+        tk.Button(root, text="Redo", command=self.redo).pack()
 
     def openFile(self):
         path = filedialog.askopenfilename()
-        if path:
-            self.state.loadImage(path)
-            self.showImage()
-
-    def showImage(self):
-        img = self.state.currentImage
-        if not img:
+        if not path:
             return
-        disp = img.resize((600, 400))
-        self.displayImg = ImageTk.PhotoImage(disp)
-        self.canvas.create_image(300, 200, image=self.displayImg)
+        try:
+            self.state.loadImage(path)
+            self.status.config(text=os.path.basename(path))
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def undo(self):
+        if self.state.undo():
+            self.status.config(text="Undo")
+        else:
+            messagebox.showinfo("Undo", "Nothing to undo")
+
+    def redo(self):
+        if self.state.redo():
+            self.status.config(text="Redo")
+        else:
+            messagebox.showinfo("Redo", "Nothing to redo")
 
 
 if __name__ == "__main__":
